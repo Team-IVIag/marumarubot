@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"regexp"
 
 	"gopkg.in/telegram-bot-api.v3"
 )
@@ -17,7 +18,7 @@ var config map[string]interface{}
 
 const (
 	TypeQuery   = 0
-	TypeArchive = 1
+	//TypeArchive = 1
 )
 
 type Counter struct {
@@ -164,6 +165,8 @@ func parseCommand(line string) (cmd string, args []string) {
 	if len(lines) > 1 {
 		args = lines[1:]
 	}
+
+	cmd = regexp.MustCompile("@.*").ReplaceAllString(cmd, "")
 	return
 }
 
