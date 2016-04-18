@@ -74,7 +74,7 @@ func main() {
 		log.Printf("#%#v: [%#v]: %#v", message.Message.From.ID, message.Message.Chat.ID, message.Message.Text)
 
 		command, args := parseCommand(message.Message.Text)
-		log.Println(started, message.Message.Date)
+
 		if started > message.Message.Date {
 			continue
 		}
