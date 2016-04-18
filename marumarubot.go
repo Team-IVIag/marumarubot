@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"gopkg.in/telegram-bot-api.v3"
 )
@@ -16,7 +17,7 @@ import (
 var config map[string]interface{}
 
 const (
-	TypeQuery = 0
+	TypeQuery = iota
 	//TypeArchive = 1
 )
 
@@ -61,6 +62,8 @@ func main() {
 		log.Panic(err)
 	}
 
+	started := getNow()
+
 	log.Printf("Logged in as %#v", bot.Self.UserName)
 
 	u := tgbotapi.NewUpdate(0)
@@ -71,6 +74,10 @@ func main() {
 		log.Printf("#%#v: [%#v]: %#v", message.Message.From.ID, message.Message.Chat.ID, message.Message.Text)
 
 		command, args := parseCommand(message.Message.Text)
+		log.Println(started, message.Message.Date)
+		if started > message.Message.Date {
+			continue
+		}
 
 		switch command {
 		case "mq":
@@ -178,4 +185,8 @@ func newMessage(message string, sendTo int64, replyTo int) (msg tgbotapi.Message
 	msg.ReplyToMessageID = replyTo
 	msg.ParseMode = tgbotapi.ModeMarkdown
 	return
+}
+
+func getNow() int {
+	return int(time.Now().Unix())
 }
