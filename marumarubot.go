@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"regexp"
 
 	"gopkg.in/telegram-bot-api.v3"
 )
@@ -17,7 +16,7 @@ import (
 var config map[string]interface{}
 
 const (
-	TypeQuery   = 0
+	TypeQuery = 0
 	//TypeArchive = 1
 )
 
@@ -166,7 +165,11 @@ func parseCommand(line string) (cmd string, args []string) {
 		args = lines[1:]
 	}
 
-	cmd = regexp.MustCompile("@.*").ReplaceAllString(cmd, "")
+	index := strings.Index(cmd, "@")
+	if index != -1 {
+		cmd = cmd[:index-1]
+	}
+
 	return
 }
 
