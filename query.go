@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/organization/cloudflare-bypass"
-	"log"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -21,7 +20,7 @@ const (
 	ArchiveFormat = "http://marumaru.in/b/manga/%d"
 	ShenRegex     = "http:\\/\\/www\\.shencomics\\.com\\/archives\\/[0-9]*"
 	ShenPrefix    = "http://www.shencomics.com/archives/"
-	ImageRegex    = "http://www.shencomics.com/wp-content/uploads/[0-9]{4}/[0-9]{2}/pic_([0-9]*)\\.jpg\\?.*"
+	ImageRegex    = "http://www.shencomics.com/wp-content/uploads/[0-9]{4}/[0-9]{2}/(.*)\\.jpg\\?.*"
 )
 
 var imagePtrn = regexp.MustCompile(ImageRegex)
