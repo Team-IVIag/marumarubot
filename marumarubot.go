@@ -71,7 +71,7 @@ func main() {
 	messages, err := bot.GetUpdatesChan(u)
 
 	for message := range messages {
-		log.Printf("#%#v: [%#v]: %#v", message.Message.From.ID, message.Message.Chat.ID, message.Message.Text)
+		log.Printf("[#%v] %v: %#v", message.Message.From.ID, message.Message.From.UserName, message.Message.Text)
 
 		command, args := parseCommand(message.Message.Text)
 
