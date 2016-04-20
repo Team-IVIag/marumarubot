@@ -138,7 +138,6 @@ func (l *LinkParser) Get(id int) (links KeySortedMap, err error) {
 
 	doc.Find("div .entry-content").Find("img").Each(func(i int, s *goquery.Selection) {
 		l, ok := s.Attr("data-lazy-src")
-		log.Println(l)
 
 		if ok {
 			if match := imagePtrn.FindStringSubmatch(l); match != nil {
