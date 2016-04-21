@@ -35,13 +35,13 @@ type Counter struct {
 // Done contains data of archive
 type Done struct {
 	archiveID int
-	paths KeySortedMap
+	paths     KeySortedMap
 }
 
 // Progress contains data of progress
 type Progress struct {
 	archiveID int
-	message string
+	message   string
 }
 
 // sendQueue
@@ -75,11 +75,11 @@ func initConfig() {
 	}
 }
 
-func processSending(bot *tgbotapi.BotAPI, done chan Done, progress chan Progress){
+func processSending(bot *tgbotapi.BotAPI, done chan Done, progress chan Progress) {
 	for {
 		select {
-		case queue := <- done:
-			go func(targets map[int]int, data Done, key int){
+		case queue := <-done:
+			go func(targets map[int]int, data Done, key int) {
 				for target := range targets {
 					for _, key := range data.paths.key {
 						path := data.paths.val[key]
@@ -96,7 +96,7 @@ func processSending(bot *tgbotapi.BotAPI, done chan Done, progress chan Progress
 				delete(targets, key)
 			}(sendQueue[queue.archiveID], queue, queue.archiveID)
 			break
-		case data := <- progress:
+		case data := <-progress:
 			for sendTo, messageID := range sendQueue[data.archiveID] {
 				log.Println(sendTo, messageID)
 				bot.Send(tgbotapi.NewEditMessageText(int64(sendTo), messageID, data.message))
@@ -108,7 +108,7 @@ func processSending(bot *tgbotapi.BotAPI, done chan Done, progress chan Progress
 func addSendQueue(archiveID, sendTo, messageID int) int {
 	cnt := 0
 	for _, val := range sendQueue {
-		for _, v := range val {
+		for v := range val {
 			cnt++
 			if v == sendTo {
 				return 0 // stop function if user already exist in queue
@@ -116,7 +116,7 @@ func addSendQueue(archiveID, sendTo, messageID int) int {
 		}
 	}
 
-	if _, ok := sendQueue[archiveID]; !ok{
+	if _, ok := sendQueue[archiveID]; !ok {
 		sendQueue[archiveID] = make(map[int]int)
 		sendQueue[archiveID][sendTo] = messageID
 		return -2
@@ -257,41 +257,43 @@ func main() {
 
 				i, _ := strconv.Atoi(args[0])
 
-				m, _ := bot.Send(msg)
+				m, err := bot.Send(msg)
+				if err != nil {
+					log.Println(err)
+				}
 
 				res := addSendQueue(i, sendTo, m.MessageID)
 				if res == 0 {
-					bot.Send(newMessage("이미 요청한 만화가 있습니다.", replyTo, messageID))
+					bot.Send(tgbotapi.NewEditMessageText(replyTo, m.MessageID, "이미 요청한 만화가 있습니다."))
+
 					return
-				}else if res == -1 {
-					bot.Send(newMessage("서버에 요청된 만화가 너무 많습니다.", replyTo, messageID))
+				} else if res == -1 {
+					bot.Send(tgbotapi.NewEditMessageText(replyTo, m.MessageID, "서버에 요청된 만화가 너무 많습니다."))
 					return
 				}
 
 				progress <- Progress{
 					archiveID: i,
-					message: "페이지를 파싱하는 중입니다...",
+					message:   "페이지를 파싱하는 중입니다...",
 				}
 				lp := LinkParser{}
 				links, _ := lp.Get(i)
 
-				log.Println("LINK")
-
 				progress <- Progress{
 					archiveID: i,
-					message: "다운로드 하는 중입니다...",
+					message:   "다운로드 하는 중입니다...",
 				}
 				dl := Downloader{archiveId: i, links: links}
 				paths, err := dl.Get()
 
 				progress <- Progress{
 					archiveID: i,
-					message: "다운로드가 완료되었습니다. 사진이 곧 개인채팅으로 전송됩니다.",
+					message:   "다운로드가 완료되었습니다. 사진이 곧 개인채팅으로 전송됩니다.",
 				}
-				log.Println("DONE")
+
 				done <- Done{
 					archiveID: i,
-					paths: paths,
+					paths:     paths,
 				}
 
 				//path, err := concatImage(dl.baseFolder, paths)
