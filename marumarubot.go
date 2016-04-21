@@ -3,6 +3,9 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"image"
+	"image/draw"
+	"image/jpeg"
 	"io/ioutil"
 	"log"
 	"os"
@@ -18,7 +21,7 @@ var config map[string]interface{}
 
 const (
 	TypeQuery = iota
-	//TypeArchive = 1
+	TypeArchive
 )
 
 type Counter struct {
@@ -151,6 +154,57 @@ func main() {
 			}()
 			break
 		case "mget": // TODO
+			if len(args) <= 0 {
+				bot.Send(newMessage("Usage: /mget <id>", message.Message.Chat.ID, message.Message.MessageID))
+				break
+			}
+
+			go func() {
+				if counter.count[TypeArchive] >= config["max-count"].(int) {
+					bot.Send(newMessage("Server has too many requests at a time. Please try again later.", message.Message.Chat.ID, message.Message.MessageID))
+					return
+				}
+				counter.mux.Lock()
+				counter.count[TypeArchive]++
+				counter.mux.Unlock()
+
+				defer func() {
+					counter.mux.Lock()
+					counter.count[TypeArchive]--
+					counter.mux.Unlock()
+				}()
+
+				i, _ := strconv.Atoi(args[0])
+
+				lp := LinkParser{}
+				links, _ := lp.Get(i)
+
+				dl := Downloader{archiveId: i, links: links}
+				paths, err := dl.Get()
+
+				for _, id := range paths.key {
+					path := paths.val[id]
+					photo := tgbotapi.NewPhotoUpload(int64(message.Message.From.ID), path)
+
+					log.Println(path)
+
+					_, err = bot.Send(photo)
+					if err != nil {
+						log.Println(err)
+					}
+				}
+				//				path, err := concatImage(dl.baseFolder, paths)
+
+				if err != nil {
+					log.Println(err)
+					return // TODO
+				}
+
+				if err != nil {
+					bot.Send(newMessage("Error", message.Message.Chat.ID, message.Message.MessageID))
+					return
+				}
+			}()
 			break
 		}
 	}
@@ -189,4 +243,63 @@ func newMessage(message string, sendTo int64, replyTo int) (msg tgbotapi.Message
 
 func getNow() int {
 	return int(time.Now().Unix())
+}
+
+func concatImage(folder string, paths KeySortedMap) (string, error) {
+	var images []image.Image
+
+	width, height := 0, 0
+	for _, id := range paths.key {
+		path := paths.val[id]
+		log.Println(path)
+
+		file, err := os.Open(path)
+		if err != nil {
+			continue
+		}
+
+		if f, err := file.Stat(); !os.IsNotExist(err) {
+			name := f.Name()
+			log.Println(name)
+			if strings.HasSuffix(name, ".jpg") {
+				img, _, _ := image.Decode(file)
+				images = append(images, img)
+
+				width = max(width, img.Bounds().Max.X-img.Bounds().Min.X)
+				height += (img.Bounds().Max.Y - img.Bounds().Min.Y)
+			}
+		}
+	}
+
+	rgba := image.NewRGBA(image.Rectangle{image.Point{0, 0}, image.Point{width, height}})
+
+	now := 0
+	for _, img := range images {
+		w := (img.Bounds().Max.X - img.Bounds().Min.X)
+		h := (img.Bounds().Max.Y - img.Bounds().Min.Y)
+		draw.Draw(rgba, image.Rectangle{image.Point{0, now}, image.Point{w, now + h}}, img, image.Point{0, 0}, draw.Src)
+
+		now += h
+	}
+
+	out, err := os.Create(folder + "result.jpg")
+	if err != nil {
+		return "", err
+	}
+
+	var opt jpeg.Options
+	opt.Quality = 80
+
+	jpeg.Encode(out, rgba, &opt)
+	out.Close()
+
+	return folder + "result.jpg", nil
+
+}
+
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
