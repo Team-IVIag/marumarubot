@@ -81,8 +81,8 @@ func processSending(bot *tgbotapi.BotAPI, done chan Done, progress chan Progress
 		case queue := <-done:
 			go func(targets map[int]int, data Done, key int) {
 				for target := range targets {
-					for _, key := range data.paths.key {
-						path := data.paths.val[key]
+					for _, k := range data.paths.key {
+						path := data.paths.val[k]
 
 						photo := tgbotapi.NewPhotoUpload(int64(target), path)
 
