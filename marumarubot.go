@@ -14,27 +14,45 @@ import (
 	"sync"
 	"time"
 
-	"gopkg.in/telegram-bot-api.v3"
+	"gopkg.in/telegram-bot-api.v4"
 )
 
 var config map[string]interface{}
 
 const (
+	// TypeQuery is identifier of querying
 	TypeQuery = iota
+	// TypeArchive is identifier of downloading archive
 	TypeArchive
 )
 
+// Counter counts count of current queues
 type Counter struct {
 	count map[int]int
 	mux   sync.Mutex
 }
 
-var counter Counter = Counter{count: make(map[int]int)}
+// Done contains data of archive
+type Done struct {
+	archiveID int
+	paths KeySortedMap
+}
+
+// Progress contains data of progress
+type Progress struct {
+	archiveID int
+	message string
+}
+
+// sendQueue
+var sendQueue map[int]map[int]int
+var counter = Counter{count: make(map[int]int)}
 
 func initConfig() {
 	tmp := make(map[string]interface{})
 	tmp["token"] = "<your_token_here>"
 	tmp["max-count"] = 3
+	tmp["max-queue"] = 5
 
 	if _, err := os.Stat("config.json"); os.IsNotExist(err) {
 		content, err := json.Marshal(tmp)
@@ -57,6 +75,60 @@ func initConfig() {
 	}
 }
 
+func processSending(bot *tgbotapi.BotAPI, done chan Done, progress chan Progress){
+	for {
+		select {
+		case queue := <- done:
+			go func(targets map[int]int, data Done, key int){
+				for target := range targets {
+					for _, key := range data.paths.key {
+						path := data.paths.val[key]
+
+						photo := tgbotapi.NewPhotoUpload(int64(target), path)
+
+						_, err := bot.Send(photo)
+						if err != nil {
+							log.Println(err)
+						}
+					}
+				}
+
+				delete(targets, key)
+			}(sendQueue[queue.archiveID], queue, queue.archiveID)
+			break
+		case data := <- progress:
+			for sendTo, messageID := range sendQueue[data.archiveID] {
+				log.Println(sendTo, messageID)
+				bot.Send(tgbotapi.NewEditMessageText(int64(sendTo), messageID, data.message))
+			}
+		}
+	}
+}
+
+func addSendQueue(archiveID, sendTo, messageID int) int {
+	cnt := 0
+	for _, val := range sendQueue {
+		for _, v := range val {
+			cnt++
+			if v == sendTo {
+				return 0 // stop function if user already exist in queue
+			}
+		}
+	}
+
+	if _, ok := sendQueue[archiveID]; !ok{
+		sendQueue[archiveID] = make(map[int]int)
+		sendQueue[archiveID][sendTo] = messageID
+		return -2
+	}
+
+	if cnt <= config["max-queue"].(int) {
+		sendQueue[archiveID][sendTo] = messageID
+		return 1
+	}
+	return -1
+}
+
 func main() {
 	initConfig()
 
@@ -72,6 +144,12 @@ func main() {
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
 	messages, err := bot.GetUpdatesChan(u)
+
+	sendQueue = make(map[int]map[int]int)
+
+	done := make(chan Done)
+	progress := make(chan Progress)
+	go processSending(bot, done, progress)
 
 	for message := range messages {
 		log.Printf("[#%v] %v: %#v", message.Message.From.ID, message.Message.From.UserName, message.Message.Text)
@@ -93,7 +171,7 @@ func main() {
 
 			go func() {
 				if counter.count[TypeQuery] >= config["max-count"].(int) {
-					bot.Send(newMessage("Server has too many requests at a time. Please try again later.", message.Message.Chat.ID, message.Message.MessageID))
+					bot.Send(newMessage("서버에 너무 많은 요청이 진행 중입니다. 나중에 다시 시도해주세요.", message.Message.Chat.ID, message.Message.MessageID))
 					return
 				}
 				counter.mux.Lock()
@@ -123,7 +201,7 @@ func main() {
 
 			go func() {
 				if counter.count[TypeQuery] >= config["max-count"].(int) {
-					bot.Send(newMessage("Server has too many requests at a time. Please try again later.", message.Message.Chat.ID, message.Message.MessageID))
+					bot.Send(newMessage("서버에 너무 많은 요청이 진행 중입니다. 나중에 다시 시도해주세요.", message.Message.Chat.ID, message.Message.MessageID))
 					return
 				}
 				counter.mux.Lock()
@@ -153,17 +231,18 @@ func main() {
 				bot.Send(newMessage(str, message.Message.Chat.ID, message.Message.MessageID))
 			}()
 			break
-		case "mget": // TODO
+		case "mget":
 			if len(args) <= 0 {
 				bot.Send(newMessage("Usage: /mget <id>", message.Message.Chat.ID, message.Message.MessageID))
 				break
 			}
 
-			go func(sendTo int) {
+			go func(sendTo int, replyTo int64, messageID int) {
 				if counter.count[TypeArchive] >= config["max-count"].(int) {
-					bot.Send(newMessage("Server has too many requests at a time. Please try again later.", message.Message.Chat.ID, message.Message.MessageID))
+					bot.Send(newMessage("서버에 너무 많은 요청이 진행 중입니다. 나중에 다시 시도해주세요.", replyTo, messageID))
 					return
 				}
+
 				counter.mux.Lock()
 				counter.count[TypeArchive]++
 				counter.mux.Unlock()
@@ -174,37 +253,56 @@ func main() {
 					counter.mux.Unlock()
 				}()
 
+				msg := newMessage("다운로드 준비 중...", replyTo, messageID)
+
 				i, _ := strconv.Atoi(args[0])
 
+				m, _ := bot.Send(msg)
+
+				res := addSendQueue(i, sendTo, m.MessageID)
+				if res == 0 {
+					bot.Send(newMessage("이미 요청한 만화가 있습니다.", replyTo, messageID))
+					return
+				}else if res == -1 {
+					bot.Send(newMessage("서버에 요청된 만화가 너무 많습니다.", replyTo, messageID))
+					return
+				}
+
+				progress <- Progress{
+					archiveID: i,
+					message: "페이지를 파싱하는 중입니다...",
+				}
 				lp := LinkParser{}
 				links, _ := lp.Get(i)
 
+				log.Println("LINK")
+
+				progress <- Progress{
+					archiveID: i,
+					message: "다운로드 하는 중입니다...",
+				}
 				dl := Downloader{archiveId: i, links: links}
 				paths, err := dl.Get()
 
-				for _, id := range paths.key {
-					path := paths.val[id]
-					photo := tgbotapi.NewPhotoUpload(int64(sendTo), path)
-
-					log.Println(path)
-
-					_, err = bot.Send(photo)
-					if err != nil {
-						log.Println(err)
-					}
+				progress <- Progress{
+					archiveID: i,
+					message: "다운로드가 완료되었습니다. 사진이 곧 개인채팅으로 전송됩니다.",
 				}
-				//				path, err := concatImage(dl.baseFolder, paths)
+				log.Println("DONE")
+				done <- Done{
+					archiveID: i,
+					paths: paths,
+				}
+
+				//path, err := concatImage(dl.baseFolder, paths)
 
 				if err != nil {
 					log.Println(err)
-					return // TODO
-				}
 
-				if err != nil {
-					bot.Send(newMessage("Error", message.Message.Chat.ID, message.Message.MessageID))
+					bot.Send(newMessage("Error", replyTo, messageID))
 					return
 				}
-			}(message.Message.From.ID)
+			}(message.Message.From.ID, message.Message.Chat.ID, message.Message.MessageID)
 			break
 		}
 	}
