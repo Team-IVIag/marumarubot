@@ -20,7 +20,7 @@ const (
 	ArchiveFormat = "http://marumaru.in/b/manga/%d"
 	ShenRegex     = "http:\\/\\/www\\.shencomics\\.com\\/archives\\/[0-9]*"
 	ShenPrefix    = "http://www.shencomics.com/archives/"
-	ImageRegex    = "http://www.shencomics.com/wp-content/uploads/[0-9]{4}/[0-9]{2}/(.*)\\.jpg\\?.*"
+	ImageRegex    = "http://www.shencomics.com/wp-content/uploads/[0-9]{4}/[0-9]{2}/(.*)\\.jpg.*"
 )
 
 var imagePtrn = regexp.MustCompile(ImageRegex)

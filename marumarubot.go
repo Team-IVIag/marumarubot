@@ -159,7 +159,7 @@ func main() {
 				break
 			}
 
-			go func() {
+			go func(sendTo int) {
 				if counter.count[TypeArchive] >= config["max-count"].(int) {
 					bot.Send(newMessage("Server has too many requests at a time. Please try again later.", message.Message.Chat.ID, message.Message.MessageID))
 					return
@@ -184,7 +184,7 @@ func main() {
 
 				for _, id := range paths.key {
 					path := paths.val[id]
-					photo := tgbotapi.NewPhotoUpload(int64(message.Message.From.ID), path)
+					photo := tgbotapi.NewPhotoUpload(int64(sendTo), path)
 
 					log.Println(path)
 
@@ -204,7 +204,7 @@ func main() {
 					bot.Send(newMessage("Error", message.Message.Chat.ID, message.Message.MessageID))
 					return
 				}
-			}()
+			}(message.Message.From.ID)
 			break
 		}
 	}
