@@ -187,11 +187,17 @@ func main() {
 
 				links, names, indexes, _ := query(keyword)
 
-				str := ""
-				for i := 0; i < len(links); i++ {
-					str += "[" + strconv.Itoa(indexes[i]) + "](" + MaruPrefix + links[i] + "): " + names[i] + "\n"
+				len := len(links)
+
+				if len > 0 {
+					str := ""
+					for i := 0; i < len; i++ {
+						str += "[" + strconv.Itoa(indexes[i]) + "](" + MaruPrefix + links[i] + "): " + names[i] + "\n"
+					}
+					bot.Send(newMessage(str, message.Message.Chat.ID, message.Message.MessageID))
+				}else{
+					bot.Send(newMessage("만화가 존재하지 않습니다.", message.Message.Chat.ID, message.Message.MessageID))
 				}
-				bot.Send(newMessage(str, message.Message.Chat.ID, message.Message.MessageID))
 			}()
 			break
 		case "mlist":
@@ -232,9 +238,10 @@ func main() {
 					return
 				}
 
-				str := ""
-
-				if len(list.key) > 0 {
+				max := len(list.key)
+				if max > 0 {
+					len := len(list.key)
+					str := fmt.Sprintf("만화 ID: %v의 검색 결과: %v개 (%v/%v 페이지)\n", i, len, p, math.Ceil(float64(len) / 5))
 					for n, id := range list.key {
 						now := math.Ceil(float64(n+1) / 5)
 						if now == float64(p) {
@@ -308,7 +315,7 @@ func main() {
 
 				progress <- Progress{
 					archiveID: i,
-					message:   "다운로드가 완료되었습니다. 사진이 곧 개인채팅으로 전송됩니다.",
+					message:   "다운로드가 완료되었습니다. " + strconv.Itoa(len(links.key)) + "개의 사진이 곧 개인채팅으로 전송됩니다.",
 				}
 
 				done <- Done{
