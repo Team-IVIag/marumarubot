@@ -8,6 +8,7 @@ import (
 	"image/jpeg"
 	"io/ioutil"
 	"log"
+	"math"
 	"os"
 	"strconv"
 	"strings"
@@ -195,11 +196,20 @@ func main() {
 			break
 		case "mlist":
 			if len(args) <= 0 {
-				bot.Send(newMessage("Usage: /mlist <id>", message.Message.Chat.ID, message.Message.MessageID))
+				bot.Send(newMessage("Usage: /mlist <id> [page]", message.Message.Chat.ID, message.Message.MessageID))
 				break
 			}
 
-			go func() {
+			page := 1
+			if len(args) > 1 {
+				page, err = strconv.Atoi(args[1])
+				if err != nil {
+					bot.Send(newMessage("페이지는 숫자로 제시해주세요.", message.Message.Chat.ID, message.Message.MessageID))
+					break
+				}
+			}
+
+			go func(p int) {
 				if counter.count[TypeQuery] >= config["max-count"].(int) {
 					bot.Send(newMessage("서버에 너무 많은 요청이 진행 중입니다. 나중에 다시 시도해주세요.", message.Message.Chat.ID, message.Message.MessageID))
 					return
@@ -215,7 +225,7 @@ func main() {
 				}()
 
 				i, _ := strconv.Atoi(args[0])
-				list, err := getList(i, 1)
+				list, err := getList(i)
 
 				if err != nil {
 					bot.Send(newMessage("Error", message.Message.Chat.ID, message.Message.MessageID))
@@ -223,13 +233,23 @@ func main() {
 				}
 
 				str := ""
-				for _, id := range list.key {
-					name := list.val[id]
-					fmt.Println(name, ShenPrefix+id)
-					str += fmt.Sprintf("[%v](%v)\n", name, ShenPrefix+id)
+
+				if len(list.key) > 0 {
+					for n, id := range list.key {
+						now := math.Ceil(float64(n+1) / 5)
+						if now == float64(p) {
+							name := list.val[id]
+							fmt.Println(name, ShenPrefix+id)
+							str += fmt.Sprintf("#%v [%v](%v)\n", id, name, ShenPrefix+id)
+						} else if now > float64(p) {
+							break
+						}
+					}
+					bot.Send(newMessage(str, message.Message.Chat.ID, message.Message.MessageID))
+				} else {
+					bot.Send(newMessage("만화가 존재하지 않습니다.", message.Message.Chat.ID, message.Message.MessageID))
 				}
-				bot.Send(newMessage(str, message.Message.Chat.ID, message.Message.MessageID))
-			}()
+			}(page)
 			break
 		case "mget":
 			if len(args) <= 0 {

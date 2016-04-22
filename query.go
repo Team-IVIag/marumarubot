@@ -73,7 +73,7 @@ func query(keyword string) (links, names []string, indexes []int, err error) {
 	return
 }
 
-func getList(id, page int) (list KeySortedMap, err error) {
+func getList(id int) (list KeySortedMap, err error) {
 	doc, err := goquery.NewDocument(fmt.Sprintf(ArchiveFormat, id))
 	if err != nil {
 		return
