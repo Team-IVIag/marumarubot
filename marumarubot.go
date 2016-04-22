@@ -238,10 +238,12 @@ func main() {
 					return
 				}
 
-				max := len(list.key)
-				if max > 0 {
-					len := len(list.key)
-					str := fmt.Sprintf("만화 ID: %v의 검색 결과: %v개 (%v/%v 페이지)\n", i, len, p, math.Ceil(float64(len) / 5))
+				count := len(list.key)
+				maxPage := int(math.Ceil(float64(count) / 5))
+				p = max(0, min(p, maxPage))
+
+				if maxPage > 0 {
+					str := fmt.Sprintf("만화 ID: %v의 검색 결과: %v개 (%v/%v 페이지)\n", i, count, p, maxPage)
 					for n, id := range list.key {
 						now := math.Ceil(float64(n+1) / 5)
 						if now == float64(p) {
@@ -422,6 +424,13 @@ func concatImage(folder string, paths KeySortedMap) (string, error) {
 
 	return folder + "result.jpg", nil
 
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func max(a, b int) int {
