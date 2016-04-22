@@ -91,14 +91,14 @@ func processSending(bot *tgbotapi.BotAPI, done chan Done, progress chan Progress
 							log.Println(err)
 						}
 					}
+					delete(sendQueue[key], target)
 				}
 
-				delete(targets, key)
+				delete(sendQueue, key)
 			}(sendQueue[queue.archiveID], queue, queue.archiveID)
 			break
 		case data := <-progress:
 			for sendTo, messageID := range sendQueue[data.archiveID] {
-				log.Println(sendTo, messageID)
 				bot.Send(tgbotapi.NewEditMessageText(int64(sendTo), messageID, data.message))
 			}
 		}
