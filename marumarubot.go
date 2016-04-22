@@ -195,7 +195,7 @@ func main() {
 						str += "[" + strconv.Itoa(indexes[i]) + "](" + MaruPrefix + links[i] + "): " + names[i] + "\n"
 					}
 					bot.Send(newMessage(str, message.Message.Chat.ID, message.Message.MessageID))
-				}else{
+				} else {
 					bot.Send(newMessage("만화가 존재하지 않습니다.", message.Message.Chat.ID, message.Message.MessageID))
 				}
 			}()
@@ -215,7 +215,7 @@ func main() {
 				}
 			}
 
-			go func(p int) {
+			go func(sendTo int64, messageID, p int) {
 				if counter.count[TypeQuery] >= config["max-count"].(int) {
 					bot.Send(newMessage("서버에 너무 많은 요청이 진행 중입니다. 나중에 다시 시도해주세요.", message.Message.Chat.ID, message.Message.MessageID))
 					return
@@ -234,18 +234,18 @@ func main() {
 				list, err := getList(i)
 
 				if err != nil {
-					bot.Send(newMessage("Error", message.Message.Chat.ID, message.Message.MessageID))
+					bot.Send(newMessage("Error", sendTo, messageID))
 					return
 				}
 
 				count := len(list.key)
-				maxPage := int(math.Ceil(float64(count) / 5))
+				maxPage := int(math.Ceil(float64(count) / 10))
 				p = max(0, min(p, maxPage))
 
 				if maxPage > 0 {
 					str := fmt.Sprintf("만화 ID: %v의 검색 결과: %v개 (%v/%v 페이지)\n", i, count, p, maxPage)
 					for n, id := range list.key {
-						now := math.Ceil(float64(n+1) / 5)
+						now := math.Ceil(float64(n+1) / 10)
 						if now == float64(p) {
 							name := list.val[id]
 							fmt.Println(name, ShenPrefix+id)
@@ -254,11 +254,11 @@ func main() {
 							break
 						}
 					}
-					bot.Send(newMessage(str, message.Message.Chat.ID, message.Message.MessageID))
+					bot.Send(newMessage(str, sendTo, messageID))
 				} else {
-					bot.Send(newMessage("만화가 존재하지 않습니다.", message.Message.Chat.ID, message.Message.MessageID))
+					bot.Send(newMessage("만화가 존재하지 않습니다.", sendTo, messageID))
 				}
-			}(page)
+			}(message.Message.Chat.ID, message.Message.MessageID, page)
 			break
 		case "mget":
 			if len(args) <= 0 {
