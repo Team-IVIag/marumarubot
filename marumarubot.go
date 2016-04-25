@@ -170,9 +170,9 @@ func main() {
 
 			keyword := strings.Join(args, " ")
 
-			go func() {
+			go func(sendTo int64, messageID int) {
 				if counter.count[TypeQuery] >= config["max-count"].(int) {
-					bot.Send(newMessage("서버에 너무 많은 요청이 진행 중입니다. 나중에 다시 시도해주세요.", message.Message.Chat.ID, message.Message.MessageID))
+					bot.Send(newMessage("서버에 너무 많은 요청이 진행 중입니다. 나중에 다시 시도해주세요.", sendTo, messageID))
 					return
 				}
 				counter.mux.Lock()
@@ -194,11 +194,11 @@ func main() {
 					for i := 0; i < len; i++ {
 						str += "[" + strconv.Itoa(indexes[i]) + "](" + MaruPrefix + links[i] + "): " + names[i] + "\n"
 					}
-					bot.Send(newMessage(str, message.Message.Chat.ID, message.Message.MessageID))
+					bot.Send(newMessage(str, sendTo, messageID))
 				} else {
-					bot.Send(newMessage("만화가 존재하지 않습니다.", message.Message.Chat.ID, message.Message.MessageID))
+					bot.Send(newMessage("만화가 존재하지 않습니다.", sendTo, messageID))
 				}
-			}()
+			}(message.Message.Chat.ID, message.Message.MessageID)
 			break
 		case "mlist":
 			if len(args) <= 0 {
